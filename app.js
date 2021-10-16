@@ -37,12 +37,14 @@ var fragmentShaderText =
 function GenerateColor() {	
 	let scaler = 10000;
 	let colorVal = 0;
+	let rgbVals = new Float32Array(3);
 	for(let i=0; i <= 4; i+=2) {
-		let val = Math.floor(Math.random() * 98) + 1;
+		let val = Math.floor(Math.random() * 69) + 30;
+		rgbVals[i/2] = val / 100.0;
 		val = val * scaler / Math.pow(10,i);
-		colorVal += val;
+		colorVal += val;	
 	}
-	console.log("ColorVal: " + colorVal);
+	return rgbVals;
 };
 
 
@@ -153,9 +155,9 @@ var InitDemo = function() {
 	//////////////////////////////////
 	//            Drawing           //
 	//////////////////////////////////
-		
-	gl.clearColor(1.0,1.0,1.0,1.0);
-	//gl.clearColor(color[0], color[1], color[2], 1.0)
+	let color = GenerateColor();
+	//gl.clearColor(1.0,1.0,1.0,1.0);
+	gl.clearColor(color[0], color[1], color[2], 1.0)
 	gl.clear(gl.COLOR_BUFFER_BIT);	//
 	gl.drawArrays(gl.TRIANGLE_STRIP,0,vertexCount*2)
 	//DrawCircle(0,0,2,8);
