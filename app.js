@@ -47,17 +47,6 @@ function GenerateColor() {
 	return rgbVals;
 };
 
-
-0x646464
-0x000001
-/*
-Math.random(1->100) * 3
-Vertex -> vec3(0.11,0.72,0.90) -> Multiply by 100 -> 
-0x64AAB3
-*/
-
-var color = GenerateColor();
-
 var InitDemo = function() {
 
 
