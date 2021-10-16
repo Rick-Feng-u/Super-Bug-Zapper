@@ -1,3 +1,14 @@
+
+
+var canvas = document.getElementById('game-surface');
+canvas.width = window.innerWidth * 0.5;
+canvas.height = window.innerHeight * 0.9;
+let aspectRatio = canvas.width / canvas.height;
+var gl = canvas.getContext('webgl');
+var vertexCount = 64;
+var triangleVertices = DrawCircle(0,0,1,vertexCount, aspectRatio);
+
+
 var vertexShaderText = [
 'precision mediump float;',
 
@@ -18,10 +29,32 @@ var fragmentShaderText =
 'void main()',
 '{',
 	
-'	gl_FragColor = vec4(1,1,0,1);',
+'	gl_FragColor = vec4(0,0,0,1);',
 '}',
 ].join('\n')
 
+// Generate a random colour for circle
+function GenerateColor() {	
+	let scaler = 10000;
+	let colorVal = 0;
+	for(let i=0; i <= 4; i+=2) {
+		let val = Math.floor(Math.random() * 98) + 1;
+		val = val * scaler / Math.pow(10,i);
+		colorVal += val;
+	}
+	console.log("ColorVal: " + colorVal);
+};
+
+
+0x646464
+0x000001
+/*
+Math.random(1->100) * 3
+Vertex -> vec3(0.11,0.72,0.90) -> Multiply by 100 -> 
+0x64AAB3
+*/
+
+var color = GenerateColor();
 
 var InitDemo = function() {
 
@@ -29,22 +62,19 @@ var InitDemo = function() {
 	//////////////////////////////////
 	//       initialize WebGL       //
 	//////////////////////////////////
-	console.log('this is working');
+	//console.log('this is working');
 
-	var canvas = document.getElementById('game-surface');
-	var gl = canvas.getContext('webgl');
+
 
 	if (!gl){
-		console.log('webgl not supported, falling back on experimental-webgl');
+		//console.log('webgl not supported, falling back on experimental-webgl');
 		gl = canvas.getContext('experimental-webgl');
 	}
 	if (!gl){
 		alert('your browser does not support webgl');
 	}
 
-	canvas.width = window.innerWidth;
-	canvas.height = window.innerHeight;
-	let aspectRatio = window.innerWidth / window.innerHeight;
+
 	gl.viewport(0,0,canvas.width,canvas.height);
 
 	
@@ -84,13 +114,13 @@ var InitDemo = function() {
 	//////////////////////////////////
 
 	//all arrays in JS is Float64 by default
-	var circleVertices = 64;
-	var triangleVertices = DrawCircle(0,0,1,circleVertices, aspectRatio);
-	console.log(triangleVertices);
+
+	//console.log(triangleVertices);
 	/*
 		//X,   Y,      
 		-0.5, 0.5,
 		0.5, 0.5,
+
 		-0.5, -0.5,
 		-0.5, -0.5,
 		0.5, 0.5,
@@ -118,31 +148,29 @@ var InitDemo = function() {
 
 	gl.useProgram(program);
 
-	canvas.onmousedown = function(ev) {
-		gl.deleteBuffer(triangleVertexBufferObject);
 
-	}
 	
 	//////////////////////////////////
 	//            Drawing           //
 	//////////////////////////////////
 		
-	gl.clearColor(1.,0.0,0.0,1.0);
+	gl.clearColor(1.0,1.0,1.0,1.0);
+	//gl.clearColor(color[0], color[1], color[2], 1.0)
 	gl.clear(gl.COLOR_BUFFER_BIT);	//
-	gl.drawArrays(gl.TRIANGLE_STRIP,0,circleVertices*2)
+	gl.drawArrays(gl.TRIANGLE_STRIP,0,vertexCount*2)
 	//DrawCircle(0,0,2,8);
 };
 
-var DrawCircle = function(x, y, radius, numOfSides, aspectRatio) {
+function DrawCircle(x, y, radius, numOfSides, aspectRatio) {
 	let origin = {x,y};
 	let pi = Math.PI;
 	x = new Float32Array(numOfSides*2);
 	y = new Float32Array(numOfSides*2);
 	vertices = new Float32Array(numOfSides*4);
-	
+
 	// cycle through each vertex in the circle
 	for(let i=0; i < numOfSides*2; i++) {
-		console.log(aspectRatio);
+		//console.log(aspectRatio);
 		x[i] = (origin.x + ( radius * Math.cos(2 * pi * i / numOfSides))) / aspectRatio;
 		y[i] = origin.y + ( radius * Math.sin(2 * pi * i / numOfSides));
 	}
@@ -155,3 +183,13 @@ var DrawCircle = function(x, y, radius, numOfSides, aspectRatio) {
 	// x + cos(2pi/numOfSides)
 	// y = sin(2pi/numOfSides)
 };
+
+var loop = function() {
+	canvas.onmousedown = function() {
+		//gl.deleteBuffer(triangleVertexBufferObject);
+		console.log("You clicked the circle!~");
+		console.log(GenerateColor());
+
+	}
+};
+requestAnimationFrame(loop);
