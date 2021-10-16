@@ -84,9 +84,12 @@ var InitDemo = function() {
 	//all arrays in JS is Float64 by default
 	var triangleVertices = [
 		//X,   Y,      
-		0.0,  0.5,    
-		-0.5,-0.5,    
-		0.5, -0.5,   
+		-0.5, 0.5,
+		0.5, 0.5,
+		-0.5, -0.5,
+		-0.5, -0.5,
+		0.5, 0.5,
+		0.5, -0.5
 	];
 
 	var triangleVertexBufferObject = gl.createBuffer();
@@ -109,6 +112,11 @@ var InitDemo = function() {
 	gl.enableVertexAttribArray(positionAttribLocation);
 
 	gl.useProgram(program);
+
+	canvas.onmousedown = function(ev) {
+		gl.deleteBuffer(triangleVertexBufferObject);
+
+	}
 	
 	//////////////////////////////////
 	//            Drawing           //
@@ -116,7 +124,20 @@ var InitDemo = function() {
 		
 	gl.clearColor(1.,0.0,0.0,1.0);
 	gl.clear(gl.COLOR_BUFFER_BIT);	//
-	gl.drawArrays(gl.TRIANGLES,0,3);
-	
+	gl.drawArrays(gl.TRIANGLES,3,3)
+};
+
+var DrawCircle = function(x, y, radius, numOfSides) {
+	let origin = {x,y};
+	let pi = Math.PI;
+	x = Float32Array(numOfSides*2);
+	y = Float32Array(numOfSides*2);
+	// cycle through each vertex in the circle
+	for(let i=0; i < numOfSides * 2; i++) {
+		x[i] = x + ( radius * Math.cos(2 * pi / numOfSides));
+		y[i] = y + ( radius * Math.sin(2 * pi / numOfSides));
 		
+	}
+	// x + cos(2pi/numOfSides)
+	// y = sin(2pi/numOfSides)
 };
