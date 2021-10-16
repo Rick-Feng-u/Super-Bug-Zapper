@@ -6,6 +6,7 @@ var vertexShaderText = [
 'void main()',
 '{',
 '	gl_Position = vec4(vertPosition,0.0,1.0);',
+'	gl_PointSize = 10.0;', 
 '}'
 ].join('\n');
 
@@ -43,6 +44,7 @@ var InitDemo = function() {
 
 	canvas.width = window.innerWidth;
 	canvas.height = window.innerHeight;
+	let aspectRatio = window.innerWidth / window.innerHeight;
 	gl.viewport(0,0,canvas.width,canvas.height);
 
 	
@@ -82,7 +84,10 @@ var InitDemo = function() {
 	//////////////////////////////////
 
 	//all arrays in JS is Float64 by default
-	var triangleVertices = [
+	var circleVertices = 64;
+	var triangleVertices = DrawCircle(0,0,1,circleVertices, aspectRatio);
+	console.log(triangleVertices);
+	/*
 		//X,   Y,      
 		-0.5, 0.5,
 		0.5, 0.5,
@@ -90,7 +95,7 @@ var InitDemo = function() {
 		-0.5, -0.5,
 		0.5, 0.5,
 		0.5, -0.5
-	];
+	];*/
 
 	var triangleVertexBufferObject = gl.createBuffer();
 	//set the active buffer to the triangle buffer
@@ -124,22 +129,29 @@ var InitDemo = function() {
 		
 	gl.clearColor(1.,0.0,0.0,1.0);
 	gl.clear(gl.COLOR_BUFFER_BIT);	//
-	gl.drawArrays(gl.TRIANGLES,3,3)
-	DrawCircle(0,0,1,8);
+	gl.drawArrays(gl.TRIANGLE_STRIP,0,circleVertices*2)
+	//DrawCircle(0,0,2,8);
 };
 
-var DrawCircle = function(x, y, radius, numOfSides) {
+var DrawCircle = function(x, y, radius, numOfSides, aspectRatio) {
 	let origin = {x,y};
 	let pi = Math.PI;
 	x = new Float32Array(numOfSides*2);
 	y = new Float32Array(numOfSides*2);
+	vertices = new Float32Array(numOfSides*4);
+	
 	// cycle through each vertex in the circle
-	for(let i=0; i < numOfSides * 2; i++) {
-		x[i] = origin.x + ( radius * Math.cos(2 * pi * i / numOfSides));
+	for(let i=0; i < numOfSides*2; i++) {
+		console.log(aspectRatio);
+		x[i] = (origin.x + ( radius * Math.cos(2 * pi * i / numOfSides))) / aspectRatio;
 		y[i] = origin.y + ( radius * Math.sin(2 * pi * i / numOfSides));
-		console.log("x: " + x[i]);
-		console.log("y: " + y[i]);
 	}
+	for(let i=0; i < numOfSides*2; i+=2) {
+		vertices[i*2] = x[i]
+		vertices[(i*2)+1] = y[i]
+	}
+
+	return vertices
 	// x + cos(2pi/numOfSides)
 	// y = sin(2pi/numOfSides)
 };
