@@ -125,18 +125,20 @@ var InitDemo = function() {
 	gl.clearColor(1.,0.0,0.0,1.0);
 	gl.clear(gl.COLOR_BUFFER_BIT);	//
 	gl.drawArrays(gl.TRIANGLES,3,3)
+	DrawCircle(0,0,1,8);
 };
 
 var DrawCircle = function(x, y, radius, numOfSides) {
 	let origin = {x,y};
 	let pi = Math.PI;
-	x = Float32Array(numOfSides*2);
-	y = Float32Array(numOfSides*2);
+	x = new Float32Array(numOfSides*2);
+	y = new Float32Array(numOfSides*2);
 	// cycle through each vertex in the circle
 	for(let i=0; i < numOfSides * 2; i++) {
-		x[i] = x + ( radius * Math.cos(2 * pi / numOfSides));
-		y[i] = y + ( radius * Math.sin(2 * pi / numOfSides));
-		
+		x[i] = origin.x + ( radius * Math.cos(2 * pi * i / numOfSides));
+		y[i] = origin.y + ( radius * Math.sin(2 * pi * i / numOfSides));
+		console.log("x: " + x[i]);
+		console.log("y: " + y[i]);
 	}
 	// x + cos(2pi/numOfSides)
 	// y = sin(2pi/numOfSides)
