@@ -6,16 +6,17 @@ canvas.height = window.innerHeight * 0.9;
 let aspectRatio = canvas.width / canvas.height;
 var gl = canvas.getContext('webgl');
 var vertexCount = 64;
-let startRadius = 0.05;
 let growthRate = 0.01;
+let gameRadius = 0.8;
 let circleSpawnSpace = 0.03;
 let circleSpawnRadius = 0.05;
-var triangleVertices = DrawCircle(0, 0, 1, vertexCount, aspectRatio);
+let circleComplexity = 128;
+var triangleVertices = DrawCircle(0, 0, gameRadius, vertexCount, aspectRatio);
+var startTime, endTime;
 
 
 var vertexShaderText = [
 	'precision mediump float;',
-
 	'attribute vec2 vertPosition;',
 
 	'void main()',
@@ -28,12 +29,11 @@ var vertexShaderText = [
 var fragmentShaderText =
 	[
 		'precision mediump float;',
-
-
+		'uniform vec4 fColor;',
 		'void main()',
 		'{',
 
-		'	gl_FragColor = vec4(0.5,0.5,0.5,1);',
+		'	gl_FragColor = fColor;',
 		'}',
 	].join('\n')
 
@@ -48,13 +48,15 @@ function createCircle() {
 	while(true) {
 		let validCircle = true;
 		theta = Math.floor(Math.random() * 360) + 1;
-		x = ((radius * Math.cos(2 * pi * theta / 360))) / aspectRatio;
-		y = (radius * Math.sin(2 * pi * theta / 360));
-		for (var i in circleMap) {
-			let deltaX = i.x - x;
-			let deltaY = i.y - y;
+		x = ((gameRadius * Math.cos(2 * Math.PI * theta / 360))) / aspectRatio;
+		y = (gameRadius * Math.sin(2 * Math.PI * theta / 360));
+		for (const [key, value] of circleMap.entries()) {
+			let deltaX = value.x - x;
+			let deltaY = value.y - y;
 			let distance = Math.sqrt(deltaX*deltaX + deltaY*deltaY);
-			if(distance < i.r + circleSpawnRadius + circleSpawnSpace) {
+			console.log("Distance: ", distance);
+			console.log("Max Distance: ", (value.r + circleSpawnRadius + circleSpawnSpace))
+			if(distance < value.r + circleSpawnRadius + circleSpawnSpace) {
 				validCircle = false;
 				break;
 			}
@@ -77,22 +79,24 @@ function createCircle() {
 
 	// create buffer for circle and add it to the hashmap
 	var vertexBuffer = gl.createBuffer();
-	
-	gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
-	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(triangleVertices), gl.STATIC_DRAW); // FIX ME
+	var fragBuffer = gl.createBuffer();
+	//console.log("XY FOR CIRCLE:",x,y);
+	let circleVertices = DrawCircle(x,y,circleSpawnRadius,vertexCount, aspectRatio);; 
 
-	circleMap.set(rgbStr,{
+	return [rgbStr,{
 		x:x,
 		y:y,
+		r:rgba[0],
+		g:rgba[1],
+		b:rgba[2],
+		a:rgba[3],
+		vertices: circleVertices,
 		r:circleSpawnRadius,
-		buffer:vertexBuffer
-	})
+		vertexBuffer:vertexBuffer,
+		fragBuffer: fragBuffer
+	}];
 }
 
-
-function deleteCircle() {
-
-}
 
 // Generate a random colour for circle
 function GenerateColor() {
@@ -104,7 +108,7 @@ function GenerateColor() {
 
 	return rgbVals;
 	//gl.clearColor(rgba[0], rgba[1], rgba[2], rgba[3]);
-	//console.log(colorVal);
+	////console.log(colorVal);
 	//return rgbVals;
 };
 GenerateColor();
@@ -116,12 +120,12 @@ var InitDemo = function () {
 	//////////////////////////////////
 	//       initialize WebGL       //
 	//////////////////////////////////
-	//console.log('this is working');
+	////console.log('this is working');
 
 
 
 	if (!gl) {
-		//console.log('webgl not supported, falling back on experimental-webgl');
+		////console.log('webgl not supported, falling back on experimental-webgl');
 		gl = canvas.getContext('experimental-webgl');
 	}
 	if (!gl) {
@@ -163,24 +167,13 @@ var InitDemo = function () {
 		return;
 	}
 
-	//////////////////////////////////
-	//    create triangle buffer    //
-	//////////////////////////////////
+	gl.useProgram(program);
 
-	//all arrays in JS is Float64 by default
-
-	//console.log(triangleVertices);
-	/*
-		//X,   Y,      
-		-0.5, 0.5,
-		0.5, 0.5,
-
-		-0.5, -0.5,
-		-0.5, -0.5,
-		0.5, 0.5,
-		0.5, -0.5
-	];*/
-
+	for(let i = 0; i < 15; i++) {
+		let circle = createCircle();
+		circleMap.set(circle[0],circle[1]);
+	}
+	
 	var triangleVertexBufferObject = gl.createBuffer();
 	//set the active buffer to the triangle buffer
 	gl.bindBuffer(gl.ARRAY_BUFFER, triangleVertexBufferObject);
@@ -188,8 +181,8 @@ var InitDemo = function () {
 	//gl.STATIC_DRAW means we send the data only once (the triangle vertex position
 	//will not change over time)
 	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(triangleVertices), gl.STATIC_DRAW);
-
 	var positionAttribLocation = gl.getAttribLocation(program, 'vertPosition');
+	//var colorAttribLocation = gl.getAttribLocation(program, 'color');
 	gl.vertexAttribPointer(
 		positionAttribLocation, //attribute location
 		2, //number of elements per attribute
@@ -198,9 +191,10 @@ var InitDemo = function () {
 		2 * Float32Array.BYTES_PER_ELEMENT,//size of an individual vertex
 		0 * Float32Array.BYTES_PER_ELEMENT//offset from the beginning of a single vertex to this attribute
 	);
+	var colorUniformLocation = gl.getUniformLocation(program, 'fColor');
+	gl.uniform4f(colorUniformLocation, 0.0, 0.0, 0.0, 1);
 	gl.enableVertexAttribArray(positionAttribLocation);
-
-	gl.useProgram(program);
+	
 
 
 
@@ -211,8 +205,31 @@ var InitDemo = function () {
 	//gl.clearColor(1.0,1.0,1.0,1.0);
 	gl.clearColor(color[0], color[1], color[2], 1.0)
 	gl.clear(gl.COLOR_BUFFER_BIT);	//
-	gl.drawArrays(gl.TRIANGLE_STRIP, 0, vertexCount * 2)
-	//DrawCircle(0,0,2,8);
+	gl.drawArrays(gl.TRIANGLE_FAN, 0, vertexCount);
+	for (const [key, value] of circleMap.entries()) {
+		//console.log(value.vertexBuffer);
+		gl.bindBuffer(gl.ARRAY_BUFFER, value.vertexBuffer);
+		//gl expecting Float32 Array not Float64
+		//gl.STATIC_DRAW means we send the data only once (the triangle vertex position
+		//will not change over time)
+		// position
+		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(value.vertices), gl.STATIC_DRAW);
+		gl.vertexAttribPointer(
+			positionAttribLocation, //attribute location
+			2, //number of elements per attribute
+			gl.FLOAT,
+			gl.FALSE,
+			2 * Float32Array.BYTES_PER_ELEMENT,//size of an individual vertex
+			0 * Float32Array.BYTES_PER_ELEMENT//offset from the beginning of a single vertex to this attribute
+		);
+		gl.enableVertexAttribArray(positionAttribLocation);
+		var colorUniformLocation = gl.getUniformLocation(program, 'fColor');
+		gl.uniform4f(colorUniformLocation, value.r, value.g, value.b, value.a);
+		gl.drawArrays(gl.TRIANGLE_FAN, 0, vertexCount);
+	}
+	
+
+	
 };
 
 function DrawCircle(x, y, radius, numOfSides, aspectRatio) {
@@ -224,18 +241,16 @@ function DrawCircle(x, y, radius, numOfSides, aspectRatio) {
 
 	// cycle through each vertex in the circle
 	for (let i = 0; i < numOfSides * 2; i++) {
-		//console.log(aspectRatio);
+		////console.log(aspectRatio);
 		x[i] = (origin.x + (radius * Math.cos(2 * pi * i / numOfSides))) / aspectRatio;
 		y[i] = origin.y + (radius * Math.sin(2 * pi * i / numOfSides));
 	}
-	for (let i = 0; i < numOfSides * 2; i += 2) {
-		vertices[i * 2] = x[i]
-		vertices[(i * 2) + 1] = y[i]
+	for (let i = 0; i <= numOfSides; i+=2) {
+		vertices[i] = x[i];
+		vertices[i+1] = y[i]
 	}
-
+	//console.log(vertices)
 	return vertices
-	// x + cos(2pi/numOfSides)
-	// y = sin(2pi/numOfSides)
 };
 
 var loop = function () {
@@ -243,7 +258,8 @@ var loop = function () {
 	canvas.onmousedown = function (event) {
 		gl.clearColor(0.21, 0.31, 0.51, 1.0) //DEBUG
 		gl.clear(gl.COLOR_BUFFER_BIT);	//
-		gl.drawArrays(gl.TRIANGLE_STRIP, 0, vertexCount * 2)
+		//gl.drawArrays(gl.TRIANGLE_STRIP, 0, vertexCount * 2)
+
 		//gl.drawArrays(gl.TRIANGLE_STRIP, 0, vertexCount * 2)
 		var pixels = new Uint8Array(
 			4 * gl.drawingBufferWidth * gl.drawingBufferHeight
@@ -262,14 +278,14 @@ var loop = function () {
 		var pixelG = pixels[4 * (event.clientY * gl.drawingBufferWidth + event.clientX) + 1];
 		var pixelB = pixels[4 * (event.clientY * gl.drawingBufferWidth + event.clientX) + 2];
 		var pixelA = pixels[4 * (event.clientY * gl.drawingBufferWidth + event.clientX) + 3];
-		console.log(pixelR);
-		console.log(pixelG);
-		console.log(pixelB);
-		console.log(pixelA);
+		//console.log(pixelR);
+		//console.log(pixelG);
+		//console.log(pixelB);
+		//console.log(pixelA);
 		//var point = uiUtils.pixelInputToCanvasCoord(event, state.canvas);
 		//var pixels = new Uint8Array(4);
 		//state.gl.readPixels(point.x, point.y, 1, 1, state.gl.RGBA, state.gl.UNSIGNED_BYTE, pixels);
-		//console.log(pixels[0]);
+		////console.log(pixels[0]);
 	}
 };
 
