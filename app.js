@@ -8,10 +8,10 @@ var positionAttribLocation;
 var colorUniformLocation;
 var scalerAttribLocation;
 var vertexCount = 64;
-let growthRate = 0.01;
+let growthRate = 0.0005;
 let gameRadius = 0.8;
 let circleSpawnSpace = 0.03;
-let circleSpawnRadius = 0.01;
+let circleSpawnRadius = 0.05;
 let circleComplexity = 128;
 let scaler = 1.2;
 var triangleVertices = DrawCircle(0, 0, gameRadius, vertexCount, aspectRatio);
@@ -48,6 +48,7 @@ const circleMap = new Map();
 function createCircle() {
 	// loop through outer-edge of circle until enough space is found to spawn a circle
 	let x=0, y=0, theta=0;
+	let counter = 0;
 	while(true) {
 		let validCircle = true;
 		theta = Math.floor(Math.random() * 360) + 1;
@@ -57,26 +58,39 @@ function createCircle() {
 			let deltaX = value.x - x;
 			let deltaY = value.y - y;
 			let distance = Math.sqrt(deltaX*deltaX + deltaY*deltaY);
-			if(distance < value.r + circleSpawnRadius + circleSpawnSpace) {
+			if(distance < value.radius + circleSpawnRadius + circleSpawnSpace) {
 				validCircle = false;
 				break;
 			}
 		}
 		if(validCircle) break;
+		counter++;
+		if(counter >= 10) {
+			console.log("Infinite loop prevented on line 68.");
+			break;
+		}
 	}
 	// generate color for circle
 	let rgbInts = GenerateColor();
 	
 	// store rgbStr as id for buffer
 	let rgbStr = "" + rgbInts[0] + rgbInts[1] + rgbInts[2]
-	const clampf = (r, g, b, a) => [r / 255, g / 255, b / 255, a];
-	let rgba = clampf(rgbInts[0], rgbInts[1], rgbInts[2], 1.0);
+
 
 	// keep generating colors until a unique one is found
 	while (circleMap.has(rgbStr)) {
 		rgbInts = GenerateColor();
 		rgbStr = "" + rgbInts[0] + rgbInts[1] + rgbInts[2]
+		counter++;
+		if(counter >= 10) {
+			console.log("Infinite loop prevented on line 86");
+			break;
+		}
 	}
+
+	console.log("REDVAL:" + rgbInts[0]);
+	const clampf = (r, g, b, a) => [r / 255, g / 255, b / 255, a];
+	let rgba = clampf(rgbInts[0], rgbInts[1], rgbInts[2], 1.0); // debug
 
 	// create buffer for circle and add it to the hashmap
 	var vertexBuffer = gl.createBuffer();
@@ -90,7 +104,7 @@ function createCircle() {
 		g:rgba[1],
 		b:rgba[2],
 		a:rgba[3],
-		r:circleSpawnRadius,
+		radius:circleSpawnRadius,
 		vertexBuffer:vertexBuffer,
 		fragBuffer: fragBuffer
 	}];
@@ -164,7 +178,7 @@ var InitDemo = function () {
 
 
 	// TEST CODE
-	for(let i = 0; i < 15; i++) {
+	for(let i = 0; i < 10; i++) {
 		let circle = createCircle();
 		circleMap.set(circle[0],circle[1]);
 	}
@@ -227,16 +241,14 @@ function DrawCircle(x, y, radius, numOfSides, aspectRatio) {
 };
 
 function newDrawCircle(circle) {
-	console.log(circle);
 	x = new Float32Array(vertexCount * 2);
 	y = new Float32Array(vertexCount * 2);
 	vertices = new Float32Array(vertexCount * 4);
-
 	// cycle through each vertex in the circle
 	for (let i = 0; i < vertexCount * 2; i++) {
 		////console.log(aspectRatio);
-		x[i] = (circle.x + (0.1 / aspectRatio * Math.cos(2 * Math.PI * i / vertexCount)));
-		y[i] = circle.y + (0.1 * Math.sin(2 * Math.PI * i / vertexCount));
+		x[i] = (circle.x + (circle.radius / aspectRatio * Math.cos(2 * Math.PI * i / vertexCount)));
+		y[i] = circle.y + (circle.radius * Math.sin(2 * Math.PI * i / vertexCount));
 	}
 	for (let i = 0; i <= vertexCount; i+=2) {
 		vertices[i] = x[i];
@@ -260,14 +272,8 @@ function newDrawCircle(circle) {
 }
 
 var loop = function () {
+	console.log("Rendering");
 	drawCircleArray();
-	var delta = 0;
-	if(timer == 0)
-		timer = new Date();
-	else {
-		delta = timer - new Date();
-		timer = newDate();
-	}
 
 	//---
 	canvas.onmousedown = function (event) {
@@ -288,11 +294,16 @@ var loop = function () {
 			pixels
 		);
 		// And here's components of a pixel on (x, y):
-		var pixelR = pixels[4 * (event.clientY * gl.drawingBufferWidth + event.clientX)];
-		var pixelG = pixels[4 * (event.clientY * gl.drawingBufferWidth + event.clientX) + 1];
-		var pixelB = pixels[4 * (event.clientY * gl.drawingBufferWidth + event.clientX) + 2];
-		var pixelA = pixels[4 * (event.clientY * gl.drawingBufferWidth + event.clientX) + 3];
-		var rgbStr = "" + pixelR + pixelG + pixelB + pixelA;
+		var rect = event.target.getBoundingClientRect();
+		x = event.clientX - rect.left;
+		y = rect.bottom - event.clientY;
+
+		var pixelR = pixels[4 * (y * gl.drawingBufferWidth + x)];
+		var pixelG = pixels[4 * (y * gl.drawingBufferWidth + x) + 1];
+		var pixelB = pixels[4 * (y * gl.drawingBufferWidth + x) + 2];
+		var pixelA = pixels[4 * (y * gl.drawingBufferWidth + x) + 3];
+		var rgbStr = "" + pixelR + pixelG + pixelB;
+		console.log("Deleting ",rgbStr);
 		circleMap.delete(rgbStr);
 		if(pixelR != 0)
 			console.log("R:",pixelR);
@@ -306,12 +317,12 @@ var loop = function () {
 		//var pixels = new Uint8Array(4);
 		//state.gl.readPixels(point.x, point.y, 1, 1, state.gl.RGBA, state.gl.UNSIGNED_BYTE, pixels);
 		////console.log(pixels[0]);
-		drawCircleArray();
 	}
+	requestAnimationFrame(loop);
 };
 requestAnimationFrame(loop);
 
-function drawCircleArray() {
+/*function drawCircleArray() {
 	for (const [key, value] of circleMap.entries()) {
 		//console.log(value.vertexBuffer);
 		var positionAttribLocation = gl.getAttribLocation(program, 'vertPosition');
@@ -334,11 +345,11 @@ function drawCircleArray() {
 		gl.uniform4f(colorUniformLocation, value.r, value.g, value.b, value.a);
 		gl.drawArrays(gl.TRIANGLE_FAN, 0, vertexCount);
 	}
-}
+}*/
 
 function drawCircleArray() {
 	for (const [key, value] of circleMap.entries()) {
-		console.log("Drawing circle");
+		value.radius = value.radius + growthRate;
 		newDrawCircle(value);
 	}
 }
