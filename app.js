@@ -1,18 +1,19 @@
-
-
 var canvas = document.getElementById('game-surface');
 canvas.width = window.innerWidth * 0.5;
 canvas.height = window.innerHeight * 0.9;
 let aspectRatio = canvas.width / canvas.height;
 var gl = canvas.getContext('webgl');
 var program = gl.createProgram();
+var positionAttribLocation;
+var colorUniformLocation;
+var scalerAttribLocation;
 var vertexCount = 64;
 let growthRate = 0.01;
 let gameRadius = 0.8;
 let circleSpawnSpace = 0.03;
-let circleSpawnRadius = 0.05;
+let circleSpawnRadius = 0.01;
 let circleComplexity = 128;
-let scaler = 0.5;
+let scaler = 1.2;
 var triangleVertices = DrawCircle(0, 0, gameRadius, vertexCount, aspectRatio);
 var elapsed = 0;
 var timer = 0;
@@ -21,12 +22,10 @@ var timer = 0;
 var vertexShaderText = [
 	'precision mediump float;',
 	'attribute vec2 vertPosition;',
-	'attribute float scaler;',
-	
 
 	'void main()',
 	'{',
-	'	gl_Position = vec4(vertPosition.x * scaler, vertPosition.y * scaler,0.0,1.0);',
+	'	gl_Position = vec4(vertPosition,0.0,1.0);',
 	'	gl_PointSize = 10.0;',
 	'}'
 ].join('\n');
@@ -58,8 +57,6 @@ function createCircle() {
 			let deltaX = value.x - x;
 			let deltaY = value.y - y;
 			let distance = Math.sqrt(deltaX*deltaX + deltaY*deltaY);
-			console.log("Distance: ", distance);
-			console.log("Max Distance: ", (value.r + circleSpawnRadius + circleSpawnSpace))
 			if(distance < value.r + circleSpawnRadius + circleSpawnSpace) {
 				validCircle = false;
 				break;
@@ -84,8 +81,6 @@ function createCircle() {
 	// create buffer for circle and add it to the hashmap
 	var vertexBuffer = gl.createBuffer();
 	var fragBuffer = gl.createBuffer();
-	//console.log("XY FOR CIRCLE:",x,y);
-	let circleVertices = DrawCircle(x,y,circleSpawnRadius,vertexCount, aspectRatio);
 
 	// return circle object
 	return [rgbStr,{
@@ -95,7 +90,6 @@ function createCircle() {
 		g:rgba[1],
 		b:rgba[2],
 		a:rgba[3],
-		vertices: circleVertices,
 		r:circleSpawnRadius,
 		vertexBuffer:vertexBuffer,
 		fragBuffer: fragBuffer
@@ -125,7 +119,7 @@ var InitDemo = function () {
 
 	if (!gl) {
 		////console.log('webgl not supported, falling back on experimental-webgl');
-		gl = canvas.getContext('experimental-webgl');
+		gl = canvas.getContext('experimental-webgl', {preserveDrawingBuffer: true});
 	}
 	if (!gl) {
 		alert('your browser does not support webgl');
@@ -165,6 +159,9 @@ var InitDemo = function () {
 	}
 
 	gl.useProgram(program);
+	positionAttribLocation = gl.getAttribLocation(program, 'vertPosition');
+	colorUniformLocation = gl.getUniformLocation(program, 'fColor');
+
 
 	// TEST CODE
 	for(let i = 0; i < 15; i++) {
@@ -179,7 +176,6 @@ var InitDemo = function () {
 	//gl.STATIC_DRAW means we send the data only once (the triangle vertex position
 	//will not change over time)
 	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(triangleVertices), gl.STATIC_DRAW);
-	var positionAttribLocation = gl.getAttribLocation(program, 'vertPosition');
 	gl.vertexAttribPointer(
 		positionAttribLocation, //attribute location
 		2, //number of elements per attribute
@@ -188,7 +184,7 @@ var InitDemo = function () {
 		2 * Float32Array.BYTES_PER_ELEMENT,//size of an individual vertex
 		0 * Float32Array.BYTES_PER_ELEMENT//offset from the beginning of a single vertex to this attribute
 	);
-	var colorUniformLocation = gl.getUniformLocation(program, 'fColor');
+
 	gl.uniform4f(colorUniformLocation, 0.0, 0.0, 0.0, 1);
 	gl.enableVertexAttribArray(positionAttribLocation);
 	
@@ -215,7 +211,7 @@ function DrawCircle(x, y, radius, numOfSides, aspectRatio) {
 	x = new Float32Array(numOfSides * 2);
 	y = new Float32Array(numOfSides * 2);
 	vertices = new Float32Array(numOfSides * 4);
-
+	
 	// cycle through each vertex in the circle
 	for (let i = 0; i < numOfSides * 2; i++) {
 		////console.log(aspectRatio);
@@ -229,6 +225,39 @@ function DrawCircle(x, y, radius, numOfSides, aspectRatio) {
 	//console.log(vertices)
 	return vertices
 };
+
+function newDrawCircle(circle) {
+	console.log(circle);
+	x = new Float32Array(vertexCount * 2);
+	y = new Float32Array(vertexCount * 2);
+	vertices = new Float32Array(vertexCount * 4);
+
+	// cycle through each vertex in the circle
+	for (let i = 0; i < vertexCount * 2; i++) {
+		////console.log(aspectRatio);
+		x[i] = (circle.x + (0.1 / aspectRatio * Math.cos(2 * Math.PI * i / vertexCount)));
+		y[i] = circle.y + (0.1 * Math.sin(2 * Math.PI * i / vertexCount));
+	}
+	for (let i = 0; i <= vertexCount; i+=2) {
+		vertices[i] = x[i];
+		vertices[i+1] = y[i]
+	}
+	gl.bindBuffer(gl.ARRAY_BUFFER, circle.vertexBuffer);
+
+	gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.DYNAMIC_DRAW);
+	gl.vertexAttribPointer(
+		positionAttribLocation, //attribute location
+		2, //number of elements per attribute
+		gl.FLOAT,
+		gl.FALSE,
+		2 * Float32Array.BYTES_PER_ELEMENT,//size of an individual vertex
+		0 * Float32Array.BYTES_PER_ELEMENT //offset from the beginning of a single vertex to this attribute
+	);
+
+	gl.enableVertexAttribArray(positionAttribLocation);
+	gl.uniform4f(colorUniformLocation, circle.r, circle.g, circle.b, circle.a);
+	gl.drawArrays(gl.TRIANGLE_FAN, 0, vertexCount);
+}
 
 var loop = function () {
 	drawCircleArray();
@@ -303,8 +332,13 @@ function drawCircleArray() {
 		gl.enableVertexAttribArray(positionAttribLocation);
 		var colorUniformLocation = gl.getUniformLocation(program, 'fColor');
 		gl.uniform4f(colorUniformLocation, value.r, value.g, value.b, value.a);
-		var scalerAttribLocation = gl.getAttribLocation(program,'scaler');
-		gl.vertexAttrib1f(scalerAttribLocation, scaler);
 		gl.drawArrays(gl.TRIANGLE_FAN, 0, vertexCount);
+	}
+}
+
+function drawCircleArray() {
+	for (const [key, value] of circleMap.entries()) {
+		console.log("Drawing circle");
+		newDrawCircle(value);
 	}
 }
