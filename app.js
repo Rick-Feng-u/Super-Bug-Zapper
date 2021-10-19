@@ -7,6 +7,7 @@ var program = gl.createProgram();
 var positionAttribLocation;
 var colorUniformLocation;
 var scalerAttribLocation;
+var triangleVertexBufferObject;
 var vertexCount = 64;
 let growthRate = 0.0005;
 let gameRadius = 0.8;
@@ -14,9 +15,14 @@ let circleSpawnSpace = 0.03;
 let circleSpawnRadius = 0.05;
 let circleComplexity = 128;
 let scaler = 1.2;
-var triangleVertices = DrawCircle(0, 0, gameRadius, vertexCount, aspectRatio);
+var triangleVertices = initGameBoardVertices(0, 0, gameRadius, vertexCount, aspectRatio);
+var innerCircleVertices = initGameBoardVertices(0, 0, gameRadius/3, vertexCount, aspectRatio);
+var poisonVertices = initGameBoardVertices(0, 0, 0.01, vertexCount, aspectRatio);
 var elapsed = 0;
 var timer = 0;
+var score = 0;
+var maxBacteria = 20;
+let maxThreshold = 2;
 
 
 var vertexShaderText = [
@@ -123,6 +129,8 @@ function GenerateColor() {
 };
 GenerateColor();
 
+var scoreCounter = document.getElementById("score");
+
 
 var InitDemo = function () {
 
@@ -178,48 +186,22 @@ var InitDemo = function () {
 
 
 	// TEST CODE
-	for(let i = 0; i < 10; i++) {
-		let circle = createCircle();
-		circleMap.set(circle[0],circle[1]);
+	for(let i = 0; i < maxBacteria; i++) {
+		spawnCircle();
 	}
 	
-	var triangleVertexBufferObject = gl.createBuffer();
-	//set the active buffer to the triangle buffer
-	gl.bindBuffer(gl.ARRAY_BUFFER, triangleVertexBufferObject);
-	//gl expecting Float32 Array not Float64
-	//gl.STATIC_DRAW means we send the data only once (the triangle vertex position
-	//will not change over time)
-	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(triangleVertices), gl.STATIC_DRAW);
-	gl.vertexAttribPointer(
-		positionAttribLocation, //attribute location
-		2, //number of elements per attribute
-		gl.FLOAT,
-		gl.FALSE,
-		2 * Float32Array.BYTES_PER_ELEMENT,//size of an individual vertex
-		0 * Float32Array.BYTES_PER_ELEMENT//offset from the beginning of a single vertex to this attribute
-	);
-
-	gl.uniform4f(colorUniformLocation, 0.0, 0.0, 0.0, 1);
-	gl.enableVertexAttribArray(positionAttribLocation);
-	
-
-
+	triangleVertexBufferObject = gl.createBuffer();
 
 	//////////////////////////////////
 	//            Drawing           //
 	//////////////////////////////////
-	let color = GenerateColor();
-	//gl.clearColor(1.0,1.0,1.0,1.0);
-	gl.clearColor(color[0], color[1], color[2], 1.0)
-	gl.clear(gl.COLOR_BUFFER_BIT);	//
-	gl.drawArrays(gl.TRIANGLE_FAN, 0, vertexCount);
-	drawCircleArray();
-	
-
-	
+	//let color = GenerateColor();
+	//gl.clearColor(color[0], color[1], color[2], 1.0)
+	//gl.clear(gl.COLOR_BUFFER_BIT);	//
+	//gl.drawArrays(gl.TRIANGLE_FAN, 0, vertexCount);
 };
 
-function DrawCircle(x, y, radius, numOfSides, aspectRatio) {
+function initGameBoardVertices(x, y, radius, numOfSides) {
 	let origin = { x, y };
 	let pi = Math.PI;
 	x = new Float32Array(numOfSides * 2);
@@ -236,8 +218,42 @@ function DrawCircle(x, y, radius, numOfSides, aspectRatio) {
 		vertices[i] = x[i];
 		vertices[i+1] = y[i]
 	}
-	//console.log(vertices)
-	return vertices
+	return vertices;
+}
+
+function DrawGameBoard() {
+	gl.bindBuffer(gl.ARRAY_BUFFER, triangleVertexBufferObject);
+
+	//gl expecting Float32 Array not Float64
+	//gl.STATIC_DRAW means we send the data only once (the triangle vertex position
+	//will not change over time)
+	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(triangleVertices), gl.STATIC_DRAW);
+	gl.vertexAttribPointer(
+		positionAttribLocation, //attribute location
+		2, //number of elements per attribute
+		gl.FLOAT,
+		gl.FALSE,
+		2 * Float32Array.BYTES_PER_ELEMENT,//size of an individual vertex
+		0 * Float32Array.BYTES_PER_ELEMENT//offset from the beginning of a single vertex to this attribute
+	);
+	
+	gl.enableVertexAttribArray(positionAttribLocation);
+	gl.uniform4f(colorUniformLocation, 0.0, 0.0, 0.0, 1);
+	gl.drawArrays(gl.TRIANGLE_FAN, 0, vertexCount);
+
+	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(innerCircleVertices), gl.STATIC_DRAW);
+	gl.vertexAttribPointer(
+		positionAttribLocation, //attribute location
+		2, //number of elements per attribute
+		gl.FLOAT,
+		gl.FALSE,
+		2 * Float32Array.BYTES_PER_ELEMENT,//size of an individual vertex
+		0 * Float32Array.BYTES_PER_ELEMENT//offset from the beginning of a single vertex to this attribute
+	);
+	
+	gl.enableVertexAttribArray(positionAttribLocation);
+	gl.uniform4f(colorUniformLocation, 1, 0, 0, 1);
+	gl.drawArrays(gl.TRIANGLE_FAN, 0, vertexCount);
 };
 
 function newDrawCircle(circle) {
@@ -272,15 +288,18 @@ function newDrawCircle(circle) {
 }
 
 var loop = function () {
-	console.log("Rendering");
+	DrawGameBoard();
 	drawCircleArray();
+	scoreCounter.innerHTML=("Score: " + score);
 
+	if(maxThreshold <= 0){
+		alert("you lose!");
+		console.log("you lose");
+	}
 	//---
 	canvas.onmousedown = function (event) {
 		drawCircleArray();
-		//gl.drawArrays(gl.TRIANGLE_STRIP, 0, vertexCount * 2)
 
-		//gl.drawArrays(gl.TRIANGLE_STRIP, 0, vertexCount * 2)
 		var pixels = new Uint8Array(
 			4 * gl.drawingBufferWidth * gl.drawingBufferHeight
 		);
@@ -304,52 +323,65 @@ var loop = function () {
 		var pixelA = pixels[4 * (y * gl.drawingBufferWidth + x) + 3];
 		var rgbStr = "" + pixelR + pixelG + pixelB;
 		console.log("Deleting ",rgbStr);
-		circleMap.delete(rgbStr);
-		if(pixelR != 0)
-			console.log("R:",pixelR);
-		if(pixelG != 0)
-			console.log("G:",pixelG);
-		if(pixelB != 0)
-			console.log("B:",pixelB);
-		if(pixelA != 0)
-			console.log("A:",pixelA);
-		//var point = uiUtils.pixelInputToCanvasCoord(event, state.canvas);
-		//var pixels = new Uint8Array(4);
-		//state.gl.readPixels(point.x, point.y, 1, 1, state.gl.RGBA, state.gl.UNSIGNED_BYTE, pixels);
-		////console.log(pixels[0]);
+		
+		if(circleMap.has(rgbStr)) {
+			circleMap.delete(rgbStr);
+			if(score == 9){
+				score=10;
+				alert("you win!");
+				
+			}
+			else{
+				score++;
+				spawnCircle();
+			}
+		}
 	}
 	requestAnimationFrame(loop);
 };
 requestAnimationFrame(loop);
 
-/*function drawCircleArray() {
-	for (const [key, value] of circleMap.entries()) {
-		//console.log(value.vertexBuffer);
-		var positionAttribLocation = gl.getAttribLocation(program, 'vertPosition');
-		gl.bindBuffer(gl.ARRAY_BUFFER, value.vertexBuffer);
-		//gl expecting Float32 Array not Float64
-		//gl.STATIC_DRAW means we send the data only once (the triangle vertex position
-		//will not change over time)
-		// position
-		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(value.vertices), gl.DYNAMIC_DRAW);
-		gl.vertexAttribPointer(
-			positionAttribLocation, //attribute location
-			2, //number of elements per attribute
-			gl.FLOAT,
-			gl.FALSE,
-			2 * Float32Array.BYTES_PER_ELEMENT,//size of an individual vertex
-			0 * Float32Array.BYTES_PER_ELEMENT//offset from the beginning of a single vertex to this attribute
-		);
-		gl.enableVertexAttribArray(positionAttribLocation);
-		var colorUniformLocation = gl.getUniformLocation(program, 'fColor');
-		gl.uniform4f(colorUniformLocation, value.r, value.g, value.b, value.a);
-		gl.drawArrays(gl.TRIANGLE_FAN, 0, vertexCount);
-	}
-}*/
-
 function drawCircleArray() {
+	for (const [key1, circle1] of circleMap.entries()) {
+		for (const [key2, circle2] of circleMap.entries()) {
+			if(key1 === key2) continue;
+			let deltaX = (circle1.x - circle2.x) * 1.1;
+			let deltaY = (circle1.y - circle2.y) * 1.1;
+			let distance = Math.sqrt(deltaX*deltaX + deltaY*deltaY);
+			var newRadius = Math.sqrt(Math.pow(circle1.radius,2),Math.pow(circle2.radius,2))
+			
+			if(distance < circle1.radius + circle2.radius) {
+				console.log("NEW RADIUS: ",newRadius);
+				if(circle1.radius > circle2.radius) {
+					console.log("BEFORE: ",circleMap.get(key1).radius);
+					circleMap.get(key1).radius *= 1.5;
+					circleMap.delete(key2);
+					console.log("AFTER: ",circleMap.get(key1).radius);
+				}
+				else{
+					console.log("BEFORE: ",circleMap.get(key2).radius);
+					circleMap.get(key2).radius *= 1.5;
+					circleMap.delete(key1);
+					console.log("AFTER: ",circleMap.get(key2).radius);
+				}
+			}
+
+			}
+		}
+
 	for (const [key, value] of circleMap.entries()) {
 		value.radius = value.radius + growthRate;
+		if(value.radius >= (gameRadius * 2/3) * 1.0) {
+			maxThreshold--;
+			circleMap.delete(key);
+			let circle = createCircle();
+			circleMap.set(circle[0],circle[1]);
+		}
 		newDrawCircle(value);
 	}
+}
+
+function spawnCircle() {
+	let circle = createCircle();
+	circleMap.set(circle[0],circle[1]);
 }
