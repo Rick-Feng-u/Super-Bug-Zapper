@@ -14,16 +14,57 @@ let gameRadius = 0.8;
 let circleSpawnSpace = 0.03;
 let circleSpawnRadius = 0.05;
 let circleComplexity = 128;
+var poisonRadius = 0.01;
+var poisonGrowthRate = 0.001;
 let scaler = 1.2;
 var triangleVertices = initGameBoardVertices(0, 0, gameRadius, vertexCount, aspectRatio);
 var innerCircleVertices = initGameBoardVertices(0, 0, gameRadius/3, vertexCount, aspectRatio);
-var poisonVertices = initGameBoardVertices(0, 0, 0.01, vertexCount, aspectRatio);
 var elapsed = 0;
 var timer = 0;
 var score = 0;
 var maxBacteria = 20;
 let maxThreshold = 2;
 
+var poisons = []
+
+function createPoison(x,y) {
+
+	const clampf = (r, g, b, a) => [r / 255, g / 255, b / 255, a];
+	let rgba = clampf(1.0, 1.0, 1.0, 1.0); 
+
+	var vertexBuffer = gl.createBuffer();
+	var fragBuffer = gl.createBuffer();
+
+	// return circle object
+	poisons.push({
+		x:x,
+		y:y,
+		r:rgba[0],
+		g:rgba[1],
+		b:rgba[2],
+		a:rgba[3],
+		radius:poisonRadius,
+		vertexBuffer:vertexBuffer,
+		fragBuffer: fragBuffer
+	});
+}
+
+function drawPoisonArray()
+{
+	var toRemove = []
+	for (var i=0; i < poisons.length; i++) {
+		poisons[i].radius = poisons[i].radius + poisonGrowthRate;
+		if(poisons[i].radius >= gameRadius * 1/6) {
+			toRemove.push(i);
+			continue;
+		}
+		newDrawCircle(poisons[i], gl.POINTS);
+		poisons[i].g = 1.0;
+	}
+
+	for (var x=0; x < toRemove.length; x++) 
+		poisons.splice(x, 1);
+}
 
 var vertexShaderText = [
 	'precision mediump float;',
@@ -32,7 +73,7 @@ var vertexShaderText = [
 	'void main()',
 	'{',
 	'	gl_Position = vec4(vertPosition,0.0,1.0);',
-	'	gl_PointSize = 10.0;',
+	'	gl_PointSize = 5.0;',
 	'}'
 ].join('\n');
 
@@ -186,7 +227,7 @@ var InitDemo = function () {
 
 
 	// TEST CODE
-	for(let i = 0; i < maxBacteria; i++) {
+	for(let i = 0; i < 5; i++) {
 		spawnCircle();
 	}
 	
@@ -195,10 +236,6 @@ var InitDemo = function () {
 	//////////////////////////////////
 	//            Drawing           //
 	//////////////////////////////////
-	//let color = GenerateColor();
-	//gl.clearColor(color[0], color[1], color[2], 1.0)
-	//gl.clear(gl.COLOR_BUFFER_BIT);	//
-	//gl.drawArrays(gl.TRIANGLE_FAN, 0, vertexCount);
 };
 
 function initGameBoardVertices(x, y, radius, numOfSides) {
@@ -256,7 +293,10 @@ function DrawGameBoard() {
 	gl.drawArrays(gl.TRIANGLE_FAN, 0, vertexCount);
 };
 
-function newDrawCircle(circle) {
+
+
+
+function newDrawCircle(circle, drawType) {
 	x = new Float32Array(vertexCount * 2);
 	y = new Float32Array(vertexCount * 2);
 	vertices = new Float32Array(vertexCount * 4);
@@ -284,19 +324,20 @@ function newDrawCircle(circle) {
 
 	gl.enableVertexAttribArray(positionAttribLocation);
 	gl.uniform4f(colorUniformLocation, circle.r, circle.g, circle.b, circle.a);
-	gl.drawArrays(gl.TRIANGLE_FAN, 0, vertexCount);
+	gl.drawArrays(drawType, 0, vertexCount);
 }
 
 var loop = function () {
 	DrawGameBoard();
 	drawCircleArray();
+	drawPoisonArray();
 	scoreCounter.innerHTML=("Score: " + score);
 
 	if(maxThreshold <= 0){
 		alert("you lose!");
 		console.log("you lose");
 	}
-	//---
+
 	canvas.onmousedown = function (event) {
 		drawCircleArray();
 
@@ -334,6 +375,12 @@ var loop = function () {
 			else{
 				score++;
 				spawnCircle();
+				var mx = event.clientX, my = event.clientY;
+				mx = mx/canvas.width - 0.5;
+				my = my/canvas.height - 0.5;
+				mx = mx*2;
+				my = my*-2;
+				createPoison(mx,my);
 			}
 		}
 	}
@@ -343,6 +390,15 @@ requestAnimationFrame(loop);
 
 function drawCircleArray() {
 	for (const [key1, circle1] of circleMap.entries()) {
+		for(let i=0; i < poisons.length; i++) {
+			let pdeltaX = (circle1.x - poisons[i].x) * 1.1;
+			let pdeltaY = (circle1.y - poisons[i].y) * 1.1;
+			let distance = Math.sqrt(pdeltaX*pdeltaX + pdeltaY*pdeltaY);
+			if(distance < circle1.radius + poisons[i].radius) {
+				circleMap.delete(key1);
+				continue;
+			}
+		}
 		for (const [key2, circle2] of circleMap.entries()) {
 			if(key1 === key2) continue;
 			let deltaX = (circle1.x - circle2.x) * 1.1;
@@ -377,7 +433,7 @@ function drawCircleArray() {
 			let circle = createCircle();
 			circleMap.set(circle[0],circle[1]);
 		}
-		newDrawCircle(value);
+		newDrawCircle(value, gl.TRIANGLE_FAN);
 	}
 }
 
